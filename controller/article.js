@@ -1,6 +1,8 @@
 const { findByIdAndUpdate } = require('../model/Article')
 const Article = require('../model/Article')
 const validateArticleInput = require('../validation/article')
+const validateCommentInput = require('../validation/comment')
+
 
 /**
  * @route GET api/articles/test
@@ -138,7 +140,8 @@ exports.ToggleLike = async ctx => {
         if (article) {
             // 判断点赞还是取消点赞
             // 判断是否有 相同id 的下表
-            const removeIndex = article.like.map(item => item.user.toString()).indexOf(article.user)
+            const removeIndex = article.like.map(item => item.user.toString()).indexOf(user._id)
+            console.log('removeIndex => ', removeIndex)
             if (removeIndex < 0) {
                 // 点赞
                 article.like.unshift({user: user._id})
@@ -157,6 +160,83 @@ exports.ToggleLike = async ctx => {
                     {new: true}
                 )
                 ctx.body = {success: true, data: updateArticle}
+            }
+        }
+    } catch (error) {
+        ctx.status = 404
+        ctx.body = { success: false, msg: '文章不存在'}
+        console.log(error)
+    }
+}
+
+/**
+ * @route POST api/articles/comment?:id
+ * @desc  创建文章评论
+ * @access 接口是私有的
+ */
+exports.CreateComment = async ctx => {
+    const id = ctx.query.id
+    const user = ctx.state.user
+    const body = ctx.request.body
+
+    // 验证评论表单
+    const { error, isValid } = validateCommentInput(body)
+    if (!isValid) {
+        ctx.status = 400
+        ctx.body = error
+        return
+    }
+
+    // 判断文章是否存在
+    try {
+        const article = await Article.findById(id)
+        if (article) {
+            const commentInfo = {
+                user: user._id,
+                content: body.content,
+                name: user.username,
+                avatar: user.avatar
+            }
+            article.comments.push(commentInfo)
+            // 更新 缓存
+            const updateArticle = await Article.findByIdAndUpdate(
+                {_id: id},
+                {$set: article},
+                {new:true}
+            )
+            ctx.body = {success: true, data: updateArticle}
+        }
+    } catch (error) {
+        ctx.status = 404
+        ctx.body = { success: false, msg: '文章不存在'}
+        console.log(error)
+    }
+}
+
+/**
+ * @route DELETE api/articles/comment?:art_id&:com_id
+ * @desc  删除文章评论
+ * @access 接口是私有的
+ */
+exports.DeleteComment = async ctx => {
+    const art_id = ctx.query.art_id
+    const com_id = ctx.query.com_id
+    const user = ctx.state.user
+
+    // 判断文章是否存在
+    try {
+        const article = await Article.findById(art_id)
+        if (article) {
+            // 查找是否有该评论
+            const removeIndex = article.comments.map(item => item._id).indexOf(com_id)
+            if (removeIndex < 0) {
+                // 未找到
+                ctx.status = 404
+                ctx.body = { success: false, msg: '评论不存在'}
+            } else {
+                // 找到
+                // 判断是否本人操作（admin可操作任何）
+                
             }
         }
     } catch (error) {
