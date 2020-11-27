@@ -4,6 +4,8 @@ const router = new Router()
 const bodyParser = require('koa-bodyparser')
 const colors = require('colors')
 const mongoose = require('mongoose')
+// 允许跨域
+const cors = require('koa2-cors')
 // token 验证
 const passport = require('koa-passport')
 
@@ -26,6 +28,19 @@ mongoose.connect(db,
   })
 
 app.use(bodyParser())
+app.use(cors({
+    origin: function(ctx) {
+      if (ctx.url === '/test') {
+        return false;
+      }
+      return '*';
+    },
+    exposeHeaders: ['WWW-Authenticate', 'Server-Authorization'],
+    maxAge: 5,
+    credentials: true,
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  }))
 
 // passport初始化
 app.use(passport.initialize())
@@ -40,10 +55,12 @@ const config = require('./config/config')
 // 引入路由
 const user = require('./routes/user')
 const article = require('./routes/article')
+const message = require('./routes/message')
 
 // 配置路由根路径
 router.use('/api/users', user)
 router.use('/api/articles', article)
+router.use('/api/messages', message)
 
 // 配置路由
 app.use(router.routes()).use(router.allowedMethods());

@@ -1,4 +1,3 @@
-const { findByIdAndUpdate } = require('../model/Article')
 const Article = require('../model/Article')
 const validateArticleInput = require('../validation/article')
 const validateCommentInput = require('../validation/comment')
@@ -197,6 +196,7 @@ exports.CreateComment = async ctx => {
                 name: user.username,
                 avatar: user.avatar
             }
+            console.log('commentInfo => ', commentInfo)
             article.comments.push(commentInfo)
             // 更新 缓存
             const updateArticle = await Article.findByIdAndUpdate(
@@ -226,17 +226,42 @@ exports.DeleteComment = async ctx => {
     // 判断文章是否存在
     try {
         const article = await Article.findById(art_id)
-        if (article) {
-            // 查找是否有该评论
-            const removeIndex = article.comments.map(item => item._id).indexOf(com_id)
-            if (removeIndex < 0) {
-                // 未找到
-                ctx.status = 404
-                ctx.body = { success: false, msg: '评论不存在'}
+        // 查找是否有该评论
+        const removeIndex = article.comments.map(item => item._id).indexOf(com_id)
+        if (removeIndex < 0) {
+            // 未找到
+            ctx.status = 404
+            ctx.body = { success: false, msg: '评论不存在'}
+        } else {
+            // 找到
+            // 判断是否为admin 允许操作
+            if (user.role === 'admin') {
+                article.comments.splice(removeIndex, 1)
+                const updateArticle = await Article.findByIdAndUpdate(
+                    {_id: art_id},
+                    {$set: article},
+                    {new: true}
+                )
+                ctx.body = { success: true, data: updateArticle }
             } else {
-                // 找到
-                // 判断是否本人操作（admin可操作任何）
-                
+                // 判断是否为本人 本人可以操作
+                const hasHandle = article.comments[removeIndex].user.toString() === user._id.toString()
+                console.log('文章的user', article.comments[removeIndex].user)
+                console.log('当前用户的id', user._id)
+                console.log('是否可以操作', hasHandle)
+                if (hasHandle) {
+                    article.comments.splice(removeIndex, 1)
+                    const updateArticle = await Article.findByIdAndUpdate(
+                        {_id: art_id},
+                        {$set: article},
+                        {new: true}
+                    )
+                    ctx.body = { success: true, data: updateArticle }
+                } else {
+                    ctx.status = 401
+                    ctx.body = { success: false, msg: '非法操作'}
+                }
+
             }
         }
     } catch (error) {
